@@ -3,8 +3,6 @@ import ssl
 from argparse import ArgumentParser
 from enum import Enum
 
-import requests
-from requests.exceptions import ConnectionError, ReadTimeout
 from scapy.config import conf
 from scapy.layers.inet import IP, TCP
 from scapy.main import load_layer
@@ -36,10 +34,10 @@ class Synprobe:
             print(f'PortsList input not provided, scanning on standard ports {self.portsList}')
 
     def syn_scanning(self, target_port) -> PortStatus:
-        print(f'Syn Scanning {target_port}')
+        print(f'Syn Scanning host={self.target_ip} port={target_port}')
         ip = IP(dst=self.target_ip)
         syn_packet = TCP(sport=1500, dport=target_port, flags="S", seq=100)
-        synack_packet = sr1(ip / syn_packet)
+        synack_packet = sr1(ip / syn_packet, timeout=3)
         if synack_packet is None:
             return PortStatus.OPEN_OR_FILTERED
         elif 'S' in synack_packet[TCP].flags and 'A' in synack_packet[TCP].flags:
@@ -50,95 +48,128 @@ class Synprobe:
             return PortStatus.CLOSED
 
     def check_tcp_server_initiated(self, target_port):
-        ip = IP(dst=self.target_ip)
-        syn_packet = TCP(sport=1600, dport=target_port, flags="S", seq=200)
-        synack_packet = sr1(ip / syn_packet)
-        ack_packet = TCP(sport=1600, dport=target_port, flags="A", ack=synack_packet[TCP].seq + 1,
-                         seq=synack_packet[TCP].ack)
-        server_response_packet = sr1(ip / ack_packet, timeout=2)
-        if server_response_packet is not None:
-            server_response_payload = bytes(server_response_packet[TCP].payload)
-            if len(server_response_payload) > 1024:
-                print(f'TCP Server Initiated Response : {bytes(server_response_packet[TCP].payload)[:1024]}')
-            else:
-                print(f'TCP Server Initiated Response : {bytes(server_response_packet[TCP].payload)}')
-            rst_packet = TCP(sport=syn_packet.sport, dport=target_port, flags="R", seq=server_response_packet[TCP].ack)
-            send(ip / rst_packet)
-            return True
-        else:
-            return False
-
-    def check_http_server(self, target_port):
-        # ip = IP(dst=self.target_ip)
-        # syn_packet = TCP(sport=1600, dport=target_port, flags="S", seq=200)
-        # synack_packet = sr1(ip / syn_packet)
-        # ack_packet = TCP(sport=1600, dport=target_port, flags="A", ack=synack_packet[TCP].seq + 1,
-        #                  seq=synack_packet[TCP].ack)
-        # sr1(ip / ack_packet, timeout=2)
-        # http_get_packet = TCP(sport=1600, dport=target_port, flags="P", seq=ack_packet[TCP].seq,
-        #                       ack=synack_packet[TCP].seq + 2)
-        # http_get_payload = Raw('GET / HTTP/1.1\r\nHost: {}\r\n\r\n'.format(self.target_ip))
-        # server_response = sr1(ip / http_get_packet / http_get_payload, timeout=10)
-        # if server_response:
-        #     print(server_response.show())
-        # else:
-        #     print("No response to HTTP GET request.")
-        url = f"http://{self.target_ip}:{target_port}"
         try:
-            response = requests.get(url, timeout=4)
-            if len(response.text) > 1024:
-                print(f'{response.text[:1024]}')
-            else:
-                print(f'{response.text}')
-            return True
-        except (ConnectionError, ReadTimeout):
-            return False
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.settimeout(3.0)
+                sock.connect((self.target_ip, target_port))
+                return sock.recv(1024)
+        except socket.timeout as err:
+            return None
+        except socket.error as err:
+            return None
 
-    def check_https_server(self, target_port):
-        url = f"https://{self.target_ip}:{target_port}"
+    def check_tcp_client_initiated(self, target_port):
         try:
-            response = requests.get(url, timeout=4)
-            if len(response.text) > 1024:
-                print(f'{response.text[:1024]}')
-            else:
-                print(f'{response.text}')
-            return True
-        except ConnectionError:
-            return False
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.settimeout(3.0)
+                sock.connect((self.target_ip, target_port))
+                try:
+                    data = sock.recv(1024)
+                    if data is not None:
+                        return None
+                except socket.timeout as err:
+                    pass
+                sock.sendall(b'GET / HTTP/1.0\r\n\r\n')
+                return sock.recv(1024)
+        except socket.timeout as err:
+            return None
+        except socket.error as err:
+            return None
 
-    def check_tls_server(self, target_port):
-        context = ssl.create_default_context()
-        with socket.create_connection((self.target_ip, 443)) as client:
-            with context.wrap_socket(client, server_hostname=self.target_ip) as tls:
-                tls.sendall(b'Hello, world')
-                print('Sent Hello World')
+    def check_generic_tcp_server(self, target_port):
+        generic_tcp_server = None
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.settimeout(3.0)
+                sock.connect((self.target_ip, target_port))
+                generic_tcp_server = ""
+                sock.sendall(b'\r\n\r\n\r\n')
+                return sock.recv(1024)
+        except socket.timeout as err:
+            return generic_tcp_server
+        except socket.error as err:
+            return generic_tcp_server
+
+    def check_tls_server_initiated(self, target_port):
+        try:
+            context = ssl.create_default_context()
+            with socket.create_connection((self.target_ip, target_port)) as client:
+                client.settimeout(3.0)
+                with context.wrap_socket(client, server_hostname=self.target_ip) as tls:
+                    return tls.recv(1024)
+        except socket.timeout as err:
+            return None
+        except socket.error as err:
+            return None
+
+    def check_tls_client_initiated(self, target_port):
+        try:
+            context = ssl.create_default_context()
+            with socket.create_connection((self.target_ip, target_port)) as client:
+                client.settimeout(3.0)
+                with context.wrap_socket(client, server_hostname=self.target_ip) as tls:
+                    try:
+                        data = tls.recv(1024)
+                        if data is not None:
+                            return None
+                    except socket.timeout as err:
+                        pass
+                    tls.send(b'GET / HTTP/1.0\r\n\r\n')
+                    return tls.recv(1024)
+        except socket.timeout as err:
+            return None
+        except socket.error as err:
+            return None
+
+    def check_generic_tls_server(self, target_port):
+        generic_tls_server = None
+        try:
+            context = ssl.create_default_context()
+            with socket.create_connection((self.target_ip, target_port)) as client:
+                client.settimeout(3.0)
+                with context.wrap_socket(client, server_hostname=self.target_ip) as tls:
+                    generic_tls_server = ""
+                    tls.sendall(b'\r\n\r\n\r\n\r\n')
+                    return tls.recv(1024)
+        except socket.timeout as err:
+            return generic_tls_server
+        except socket.error as err:
+            return generic_tls_server
 
     def scan_port(self, target_port):
         # identify if the port is open or not, if it is closed, then print that the port is closed and exit
         port_status = self.syn_scanning(target_port)
         print(f'Port {target_port} Status {port_status}')
         if port_status == PortStatus.OPEN:
-            # print(f'TCP Server Initiated : {self.check_tcp_server_initiated(target_port)}')
-            # print(f'HTTP Server : {self.check_http_server(target_port)}')
-            # print(f'HTTPS Server : {self.check_https_server(target_port)}')
-            print(f'TLS_Server Check{self.check_tls_server(target_port)}')
+            tls_server_initiated_check_status = self.check_tls_server_initiated(target_port)
+            if tls_server_initiated_check_status is not None:
+                print(f'TLS Server Initiated Protocol Detected \nResponse: {tls_server_initiated_check_status}')
+                return
 
-        # Check for server initiated protocols
-        # attempt to connect to the port, with timeout of 3 s.
-        # if timeout => move to below section to do active probing
-        # else {
-        # 	//print the 1024 bytes of the response.
-        # 	return
-        # }
+            tls_client_initiated_check_status = self.check_tls_client_initiated((target_port))
+            if tls_client_initiated_check_status is not None:
+                print(f'TLS Client Initiated Protocol Detected \nResponse: {tls_client_initiated_check_status}')
+                return
 
-        # Check for client-initiated portocols
+            tls_generic_server_check_status = self.check_generic_tls_server(target_port)
+            if tls_generic_server_check_status is not None:
+                print(f'TLS Generic Server Detected \nResponse: {tls_generic_server_check_status}')
+                return
 
-        # check if the open port is TCP server-initiated (server banner was immediately returned over TCP)
-        # check if the open port is TLS server-initiated (server banner was immediately returned over TLS)
-        # check if the open port is HTTP server (GET request over TCP successfully elicited a response)
-        # check if the open port is HTTPS server (GET request over TLS successfully elicited a response)
-        # check if the open port is Generic TCP server (Generic lines over TCP may or may not elicit a response)
-        # check if the open port is Generic TLS server (Generic lines over TLS may or may not elicit a response)
+            tcp_server_initiated_check_status = self.check_tcp_server_initiated(target_port)
+            if tcp_server_initiated_check_status is not None:
+                print(f'TCP Server Initiated Detected \nResponse: {tcp_server_initiated_check_status}')
+                return
+
+            tcp_client_initiated_check_status = self.check_tcp_client_initiated(target_port)
+            if tcp_client_initiated_check_status is not None:
+                print(f'TCP Client Initiated Protocol Detected \nResponse: {tcp_client_initiated_check_status}')
+                return
+
+            tcp_generic_server_check_status = self.check_generic_tcp_server(target_port)
+            if tcp_generic_server_check_status is not None:
+                print(f'TCP Generic Server Detected \nResponse: {tcp_generic_server_check_status}')
+                return
 
     def start(self):
         conf.verb = 0  # Suppress Scapy output to keep output clean
