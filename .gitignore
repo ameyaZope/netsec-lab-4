@@ -27,3 +27,5 @@ synprobe
 *.log
 
 .idea
+
+__pycache__
