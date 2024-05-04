@@ -3,6 +3,7 @@ import ssl
 from argparse import ArgumentParser
 from enum import Enum
 
+import requests
 from scapy.config import conf
 from scapy.layers.inet import IP, TCP
 from scapy.main import load_layer
@@ -125,6 +126,7 @@ class Synprobe:
         generic_tls_server = None
         try:
             context = ssl.create_default_context()
+            context.load_verify_locations(cafile='./cert.pem')
             with socket.create_connection((self.target_ip, target_port)) as client:
                 client.settimeout(3.0)
                 with context.wrap_socket(client, server_hostname=self.target_ip) as tls:
@@ -136,11 +138,57 @@ class Synprobe:
         except socket.error as err:
             return generic_tls_server
 
+    def check_http_server(self, target_port):
+        output = None
+        try:
+            response = requests.get(f'http://{self.target_ip}:{target_port}', timeout=3)
+
+            output = ""
+            output += f"URL: {response.url}\n"
+            output += "Method: GET\n"
+            output += f"Status Code: {response.status_code}\n"
+            output += "Headers:\n"
+            for header, value in response.headers.items():
+                output += f"  {header}: {value}\n"
+            output += "Cookies:\n"
+            for name, value in response.cookies.items():
+                output += f"  {name}: {value}\n"
+            output += "Content:\n"
+            output += response.text + "\n"
+            return output[:1024]
+        except requests.RequestException as error:
+            return output
+
+    def check_https_server(self, target_port):
+        output = None
+        try:
+            response = requests.get(f'http://{self.target_ip}:{target_port}', timeout=3)
+
+            output = ""
+            output += f"URL: {response.url}\n"
+            output += "Method: GET\n"
+            output += f"Status Code: {response.status_code}\n"
+            output += "Headers:\n"
+            for header, value in response.headers.items():
+                output += f"  {header}: {value}\n"
+            output += "Cookies:\n"
+            for name, value in response.cookies.items():
+                output += f"  {name}: {value}\n"
+            output += "Content:\n"
+            output += response.text + "\n"
+            return output[:1024]
+        except requests.RequestException as error:
+            return output
+
     def scan_port(self, target_port):
         # identify if the port is open or not, if it is closed, then print that the port is closed and exit
         port_status = self.syn_scanning(target_port)
         print(f'Port {target_port} Status {port_status}')
         if port_status == PortStatus.OPEN:
+            https_server_check_status = self.check_https_server(target_port)
+            if https_server_check_status is not None:
+                print(f'HTTPS Server Detected \nResponse: {https_server_check_status}')
+
             tls_server_initiated_check_status = self.check_tls_server_initiated(target_port)
             if tls_server_initiated_check_status is not None:
                 print(f'TLS Server Initiated Protocol Detected \nResponse: {tls_server_initiated_check_status}')
@@ -156,9 +204,14 @@ class Synprobe:
                 print(f'TLS Generic Server Detected \nResponse: {tls_generic_server_check_status}')
                 return
 
+            http_server_check_status = self.check_http_server(target_port)
+            if http_server_check_status is not None:
+                print(f'HTTP Server Detected \nResponse: \n{http_server_check_status}')
+                return
+
             tcp_server_initiated_check_status = self.check_tcp_server_initiated(target_port)
             if tcp_server_initiated_check_status is not None:
-                print(f'TCP Server Initiated Detected \nResponse: {tcp_server_initiated_check_status}')
+                print(f'TCP Server Initiated Protocol Detected \nResponse: {tcp_server_initiated_check_status}')
                 return
 
             tcp_client_initiated_check_status = self.check_tcp_client_initiated(target_port)
