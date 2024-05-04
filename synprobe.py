@@ -211,6 +211,7 @@ class Synprobe:
             if https_server_check_status is not None:
                 print(f'HTTPS Server Detected \nResponse:')
                 hexdump.hexdump(https_server_check_status)
+                return
 
             tls_server_initiated_check_status = self.check_tls_server_initiated(target_port)
             if tls_server_initiated_check_status is not None:
