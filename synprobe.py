@@ -17,6 +17,9 @@ class PortStatus(Enum):
     FILTERED = 2
     OPEN_OR_FILTERED = 3
 
+    def __str__(self):
+        return self.name
+
 
 class Synprobe:
     def __init__(self, ports_list: str, target_ip: str) -> None:
@@ -202,7 +205,7 @@ class Synprobe:
     def scan_port(self, target_port):
         # identify if the port is open or not, if it is closed, then print that the port is closed and exit
         port_status = self.syn_scanning(target_port)
-        print(f'Port {target_port} Status {port_status}')
+        print(f'Port: {target_port} Status: {port_status}')
         if port_status == PortStatus.OPEN:
             https_server_check_status = self.check_https_server(target_port)
             if https_server_check_status is not None:
