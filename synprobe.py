@@ -4,7 +4,6 @@ from argparse import ArgumentParser
 from enum import Enum
 
 import hexdump
-import requests
 from scapy.config import conf
 from scapy.layers.inet import IP, TCP
 from scapy.main import load_layer
@@ -118,52 +117,38 @@ class Synprobe:
                 return None
 
     def check_http_server(self, target_port):
-        output = None
         try:
-            response = requests.get(f'http://{self.target_ip}:{target_port}', timeout=3)
-
-            output = ""
-            output += f"URL: {response.url}\n"
-            output += "Method: GET\n"
-            output += f"Status Code: {response.status_code}\n"
-            output += "Headers:\n"
-            for header, value in response.headers.items():
-                output += f"  {header}: {value}\n"
-            output += "Cookies:\n"
-            for name, value in response.cookies.items():
-                output += f"  {name}: {value}\n"
-            output += "Content:\n"
-            output += response.text + "\n"
-            return output[:1024].encode()
-        except requests.RequestException as error:
-            if output is not None:
-                return output[:1024].encode()
-            else:
-                return None
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.settimeout(3.0)
+                sock.connect((self.target_ip, target_port))
+                sock.sendall(b'GET / HTTP/1.0\r\n\r\n')
+                data = sock.recv(1024)
+                if data.decode().startswith('HTTP'):
+                    return data
+                else:
+                    return None
+        except socket.timeout as err:
+            return None
+        except socket.error as err:
+            return None
 
     def check_https_server(self, target_port):
-        output = None
         try:
-            response = requests.get(f'https://{self.target_ip}:{target_port}', timeout=3)
-
-            output = ""
-            output += f"URL: {response.url}\n"
-            output += "Method: GET\n"
-            output += f"Status Code: {response.status_code}\n"
-            output += "Headers:\n"
-            for header, value in response.headers.items():
-                output += f"  {header}: {value}\n"
-            output += "Cookies:\n"
-            for name, value in response.cookies.items():
-                output += f"  {name}: {value}\n"
-            output += "Content:\n"
-            output += response.text + "\n"
-            return output[:1024].encode()
-        except requests.RequestException as error:
-            if output is not None:
-                return output[:1024].encode()
-            else:
-                return None
+            context = ssl.create_default_context()
+            context.load_verify_locations(cafile='./cert.pem')
+            with socket.create_connection((self.target_ip, target_port)) as client:
+                client.settimeout(3.0)
+                with context.wrap_socket(client, server_hostname=self.target_ip) as tls:
+                    tls.sendall(b'GET / HTTP/1.0\r\n\r\n')
+                    data = tls.recv(1024)
+                    if data.decode().startswith('HTTP'):
+                        return data
+                    else:
+                        return None
+        except socket.timeout as err:
+            return None
+        except socket.error as err:
+            return None
 
     def scan_port(self, target_port):
         # identify if the port is open or not, if it is closed, then print that the port is closed and exit
