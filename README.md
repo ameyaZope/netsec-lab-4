@@ -10,9 +10,7 @@ To start the ssh server on kali, run the following command
 sudo service ssh start
 ```
 
-### TCP Client Initiated Protocol
-Testing for tcp client initiated protocol was done by using a HTTP Server. Server used for testing was  
-www.cs.stonybrook.edu 80   # type "GET / HTTP/1.0" and press 'enter' twice
+![tcp_server_initiated.png](./images/tcp_server_initiated.png)
 
 ### TCP Generic Server
 Testing for generic tcp server was done by ncat. To run a TCP ncat server, run the below
@@ -20,6 +18,8 @@ command
 ```bash
 ncat -lkv -p 9090
 ```
+
+![tcp_generic_server.png](./images/tcp_generic_server.png)
 
 ### TLS Server Initiated Protocol Testing
 Testing for TLS connection, where the communication is initiated by the server is done the server **imap.gmail.com:993**. Please note that
@@ -35,18 +35,7 @@ openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -node
 # Run the tls server
 python3 tls_server.py
 ```
-
-### TLS Client Initiated Protocol Testing
-Testing for TLS connection, where the communication is initiated by the client is done by using the url  
-www.cs.stonybrook.edu:443   (# type "GET / HTTP/1.0" and press 'enter' twice).
-
-Run the below commands on your terminal to start a TLS server using ncat
-```bash
-# Generate the ssl cert and key required
-openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes 
-# Run the tls server
-ncat -lkv -p 9090 --ssl --ssl-cert <path-to-ssl-cert> --ssl-key <path-to-ssl-key>
-```
+![tls_server_initiated.png](./images/tls_server_initiated.png)
 
 ### Generic TLS Server
 To test for a generic TLS server we first create our own cert.pem and key.pem file using the below command.  
@@ -61,6 +50,21 @@ establish the authenticity of the presented certificate. This lack of trusted pa
 2. Production Testing Option : The cert file presented by the server must be issued by a valid Certificate Authority whose certificate is
 already present in the cacerts list
 
+![tls_generic_server.png](./images/tls_generic_server.png)
+
+### HTTP Server Testing
+
+Below is an image capturing the testing done for http server
+
+![http_server.png](./images/http_server.png)
+
+### HTTPS Server Testing
+
+Below is an image capturing the testing done for https server
+
+![https_server.png](./images/https_server.png)
+
+
 ### Blocked/Filtered Port
 **iptables** is the firewall for linux. By default, there are no firewall rules set on linux.  
 To check the firewall rules on linux, use the below command
@@ -74,6 +78,9 @@ a port say 9092. To add a rule to iptables to drop all tcp packets on 9092, run 
 ```bash
 sudo iptables -A INPUT -p tcp --dport 9092 -j DROP
 ```
+
+For enabling closed port or filtererd port detection you must use the self.syn_scanning(target_port)  
+function that will enable the full syn scanning instead of the current connect scanning.
 
 ### Debugging Experience
 When I ran my synprobe for the first time, the machine on which I ran the synprobe ended up sending  
