@@ -51,6 +51,17 @@ class Synprobe:
         elif 'R' in synack_packet[TCP].flags:
             return PortStatus.CLOSED
 
+    def syn_scannings(self, target_port):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.settimeout(3.0)
+                sock.connect((self.target_ip, target_port))
+                return PortStatus.OPEN
+        except socket.timeout as err:
+            return None
+        except socket.error as err:
+            return None
+
     def check_tcp_server_initiated(self, target_port):
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -152,7 +163,7 @@ class Synprobe:
 
     def scan_port(self, target_port):
         # identify if the port is open or not, if it is closed, then print that the port is closed and exit
-        port_status = self.syn_scanning(target_port)
+        port_status = self.syn_scannings(target_port)
         print(f'Port: {target_port} Status: {port_status}')
         if port_status == PortStatus.OPEN:
             https_server_check_status = self.check_https_server(target_port)
