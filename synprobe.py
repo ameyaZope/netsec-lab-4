@@ -63,24 +63,6 @@ class Synprobe:
         except socket.error as err:
             return None
 
-    def check_tcp_client_initiated(self, target_port):
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                sock.settimeout(3.0)
-                sock.connect((self.target_ip, target_port))
-                try:
-                    data = sock.recv(1024)
-                    if data is not None:
-                        return None
-                except socket.timeout as err:
-                    pass
-                sock.sendall(b'GET / HTTP/1.0\r\n\r\n')
-                return sock.recv(1024)
-        except socket.timeout as err:
-            return None
-        except socket.error as err:
-            return None
-
     def check_generic_tcp_server(self, target_port):
         generic_tcp_server = None
         try:
@@ -107,25 +89,6 @@ class Synprobe:
             with socket.create_connection((self.target_ip, target_port)) as client:
                 client.settimeout(3.0)
                 with context.wrap_socket(client, server_hostname=self.target_ip) as tls:
-                    return tls.recv(1024)
-        except socket.timeout as err:
-            return None
-        except socket.error as err:
-            return None
-
-    def check_tls_client_initiated(self, target_port):
-        try:
-            context = ssl.create_default_context()
-            with socket.create_connection((self.target_ip, target_port)) as client:
-                client.settimeout(3.0)
-                with context.wrap_socket(client, server_hostname=self.target_ip) as tls:
-                    try:
-                        data = tls.recv(1024)
-                        if data is not None:
-                            return None
-                    except socket.timeout as err:
-                        pass
-                    tls.send(b'GET / HTTP/1.0\r\n\r\n')
                     return tls.recv(1024)
         except socket.timeout as err:
             return None
@@ -209,49 +172,37 @@ class Synprobe:
         if port_status == PortStatus.OPEN:
             https_server_check_status = self.check_https_server(target_port)
             if https_server_check_status is not None:
-                print(f'HTTPS Server Detected \nResponse:')
+                print(f'Type 4: HTTPS Server Detected \nResponse:')
                 hexdump.hexdump(https_server_check_status)
                 return
 
             tls_server_initiated_check_status = self.check_tls_server_initiated(target_port)
             if tls_server_initiated_check_status is not None:
-                print(f'TLS Server Initiated Protocol Detected \nResponse:')
+                print(f'Type 2: TLS Server Initiated Protocol Detected \nResponse:')
                 hexdump.hexdump(tls_server_initiated_check_status)
-                return
-
-            tls_client_initiated_check_status = self.check_tls_client_initiated((target_port))
-            if tls_client_initiated_check_status is not None:
-                print(f'TLS Client Initiated Protocol Detected \nResponse:')
-                hexdump.hexdump(tls_client_initiated_check_status)
                 return
 
             tls_generic_server_check_status = self.check_generic_tls_server(target_port)
             if tls_generic_server_check_status is not None:
-                print(f'TLS Generic Server Detected \nResponse:')
+                print(f'Type 6: TLS Generic Server Detected \nResponse:')
                 {hexdump.hexdump(tls_generic_server_check_status)}
                 return
 
             http_server_check_status = self.check_http_server(target_port)
             if http_server_check_status is not None:
-                print(f'HTTP Server Detected \nResponse:')
+                print(f'Type 3: HTTP Server Detected \nResponse:')
                 hexdump.hexdump(http_server_check_status)
                 return
 
             tcp_server_initiated_check_status = self.check_tcp_server_initiated(target_port)
             if tcp_server_initiated_check_status is not None:
-                print(f'TCP Server Initiated Protocol Detected \nResponse: ')
+                print(f'Type 1: TCP Server Initiated Protocol Detected \nResponse: ')
                 hexdump.hexdump(tcp_server_initiated_check_status)
-                return
-
-            tcp_client_initiated_check_status = self.check_tcp_client_initiated(target_port)
-            if tcp_client_initiated_check_status is not None:
-                print(f'TCP Client Initiated Protocol Detected \nResponse:')
-                hexdump.hexdump(tcp_client_initiated_check_status)
                 return
 
             tcp_generic_server_check_status = self.check_generic_tcp_server(target_port)
             if tcp_generic_server_check_status is not None:
-                print(f'TCP Generic Server Detected \nResponse:')
+                print(f'Type 5: TCP Generic Server Detected \nResponse:')
                 hexdump.hexdump(tcp_generic_server_check_status)
                 return
 
