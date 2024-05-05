@@ -1,4 +1,19 @@
 # Synprobe
+This tool is a network port scanning tool. If specific ports are provided then those ports are  
+scanned else a standard list of ports are scanned.  First the tool checks for open port on tcp using  
+syn-scanning. Once an open port is detected we try to detect on the following 6 cases.
+
+1. Type 1: TCP Server Initiated Protocol Detected
+2. Type 2: TLS Server Initiated Protocol Detected
+3. Type 3: HTTP Server Detected
+4. Type 4: HTTPS Server Detected
+5. Type 5: TCP Generic Server Detected
+6. Type 6: TLS Generic Server Detected
+
+If one of the 6 types is detected then the tool also prints the first 1024 bytes that are received  
+by the tool. The printing format of the response is the same as that of hexdump. This is done to  
+replace non-printable bytes with a dot ('.') - otherwise binary protocols will clutter the console.
+
 
 ## Testing
 
