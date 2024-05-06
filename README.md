@@ -24,7 +24,6 @@ To start the ssh server on kali, run the following command
 ```bash
 sudo service ssh start
 ```
-
 ![tcp_server_initiated.png](./images/tcp_server_initiated.png)
 
 ### TCP Generic Server
@@ -33,7 +32,6 @@ command
 ```bash
 ncat -lkv -p 9090
 ```
-
 ![tcp_generic_server.png](./images/tcp_generic_server.png)
 
 ### TLS Server Initiated Protocol Testing
@@ -69,16 +67,23 @@ already present in the cacerts list
 
 ### HTTP Server Testing
 
-Below is an image capturing the testing done for http server
-
+Below image captures the testing done for http server to print the first 1024 bytes
 ![http_server.png](./images/http_server.png)
 
 ### HTTPS Server Testing
 
-Below is an image capturing the testing done for https server
-
+Below image captures the testing done for https server to print the first 1024 bytes
 ![https_server.png](./images/https_server.png)
 
+### Multiport Testing
+
+Below is an image capturing the multiport scan done for custom ports
+![multiport_testing.png](./images/multiport_testing.png)
+
+### No Ports Provided Testing
+
+Below is an image capturing the scan done when no port input is provided
+![default_port_testing.png](./images/default_port_testing.png)
 
 ### Blocked/Filtered Port
 **iptables** is the firewall for linux. By default, there are no firewall rules set on linux.  
