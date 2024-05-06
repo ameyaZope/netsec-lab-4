@@ -14,7 +14,6 @@ class PortStatus(Enum):
     CLOSED = 0
     OPEN = 1
     FILTERED = 2
-    OPEN_OR_FILTERED = 3
 
     def __str__(self):
         return self.name
@@ -43,7 +42,7 @@ class Synprobe:
         syn_packet = TCP(sport=1500, dport=target_port, flags="S", seq=100)
         synack_packet = sr1(ip / syn_packet, timeout=3)
         if synack_packet is None:
-            return PortStatus.OPEN_OR_FILTERED
+            return PortStatus.FILTERED
         elif 'S' in synack_packet[TCP].flags and 'A' in synack_packet[TCP].flags:
             rst_packet = TCP(sport=syn_packet.sport, dport=target_port, flags="R", seq=synack_packet[TCP].ack)
             send(ip / rst_packet)
